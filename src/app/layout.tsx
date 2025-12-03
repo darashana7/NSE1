@@ -14,24 +14,23 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
+  title: "NSE Live Stocks - Real-time Indian Stock Market Data",
+  description: "Track NSE stocks in real-time with live prices, market indices, watchlists, price alerts, sector analysis, and stock comparison tools.",
+  keywords: ["NSE", "stocks", "Indian stock market", "live stocks", "NIFTY 50", "SENSEX", "stock alerts", "market analysis"],
+  authors: [{ name: "NSE Live" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/favicon.ico",
   },
   openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
+    title: "NSE Live Stocks",
+    description: "Real-time Indian stock market data and analysis",
+    siteName: "NSE Live Stocks",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
+    title: "NSE Live Stocks",
+    description: "Real-time Indian stock market data and analysis",
   },
 };
 
