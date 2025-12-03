@@ -158,11 +158,24 @@ export async function GET(request: NextRequest) {
                 controller.enqueue(encoder.encode(heartbeatMsg))
             }, 15000)
 
+            // Soft timeout to close connection before Vercel 300s limit
+            // We'll close at 290s to be safe
+            const timeoutId = setTimeout(() => {
+                console.log('[WebSocket] Closing connection due to timeout limit')
+                cleanup()
+                controller.close()
+            }, 290000)
+
+            const cleanup = () => {
+                clearInterval(intervalId)
+                clearInterval(heartbeatId)
+                clearTimeout(timeoutId)
+            }
+
             // Cleanup on client disconnect
             request.signal.addEventListener('abort', () => {
                 console.log('[WebSocket] Client disconnected, cleaning up')
-                clearInterval(intervalId)
-                clearInterval(heartbeatId)
+                cleanup()
                 controller.close()
             })
         },
