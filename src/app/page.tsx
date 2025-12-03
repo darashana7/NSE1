@@ -17,6 +17,7 @@ import { AlertManager } from '@/components/AlertManager'
 import { AdvancedChart } from '@/components/AdvancedChart'
 import { SectorDashboard } from '@/components/SectorDashboard'
 import { StockComparison } from '@/components/StockComparison'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { useToast } from '@/hooks/use-toast'
 
 interface Stock {
@@ -229,6 +230,7 @@ export default function StocksDashboard() {
                 <p className="text-muted-foreground">Real-time Indian stock market data</p>
               </div>
               <div className="flex items-center gap-2">
+                <ThemeToggle />
                 <Badge variant="outline" className="flex items-center gap-1">
                   <Activity className="w-3 h-3 text-green-500" />
                   Live
