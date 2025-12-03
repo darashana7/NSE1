@@ -116,6 +116,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -125,25 +126,55 @@
   .gradient-purple {
     background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
   }
-  
+
   .gradient-purple-subtle {
     background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(167, 139, 250, 0.05) 100%);
   }
-  
+
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-purple-400;
   }
-  
+
   .card-hover {
     @apply transition-all duration-300 hover:shadow-lg hover:scale-[1.02];
   }
-  
+
   .nav-link {
     @apply relative transition-colors duration-200 hover:text-primary;
   }
-  
+
   .nav-link-active::after {
     content: '';
     @apply absolute bottom-0 left-0 w-full h-0.5 bg-primary;
+  }
+
+  /* Alert Card Animations */
+  .alert-card-active {
+    @apply border-purple-500/50 bg-gradient-to-br from-purple-50/50 to-transparent;
+  }
+
+  .dark .alert-card-active {
+    @apply from-purple-950/20;
+  }
+
+  .alert-card-triggered {
+    @apply border-green-500 bg-green-50 animate-pulse;
+  }
+
+  .dark .alert-card-triggered {
+    @apply bg-green-950/20;
+  }
+
+  .alert-card-paused {
+    @apply border-muted bg-muted/20 opacity-70;
+  }
+
+  /* Alert Progress Bar */
+  .alert-progress {
+    @apply h-2 rounded-full overflow-hidden bg-muted;
+  }
+
+  .alert-progress-bar {
+    @apply h-full bg-gradient-to-r from-purple-500 to-purple-400 transition-all duration-500;
   }
 }

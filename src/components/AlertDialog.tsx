@@ -129,6 +129,15 @@ export function AlertDialog({ symbol, name, currentPrice }: AlertDialogProps) {
         }
     }
 
+    const applyQuickPercentage = (percent: number) => {
+        if (alertType === 'PRICE_ABOVE' || alertType === 'PRICE_BELOW') {
+            const newPrice = currentPrice * (1 + percent / 100)
+            setTargetValue(newPrice.toFixed(2))
+        } else {
+            setTargetValue(Math.abs(percent).toString())
+        }
+    }
+
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -175,11 +184,82 @@ export function AlertDialog({ symbol, name, currentPrice }: AlertDialogProps) {
                             value={targetValue}
                             onChange={(e) => setTargetValue(e.target.value)}
                         />
+                        {/* Quick Percentage Buttons */}
+                        <div className="flex gap-2 flex-wrap">
+                            <span className="text-xs text-muted-foreground mr-2 flex items-center">
+                                Quick select:
+                            </span>
+                            {(alertType === 'PRICE_ABOVE' || alertType === 'PERCENT_CHANGE_UP') && (
+                                <>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={() => applyQuickPercentage(5)}
+                                    >
+                                        +5%
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={() => applyQuickPercentage(10)}
+                                    >
+                                        +10%
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={() => applyQuickPercentage(15)}
+                                    >
+                                        +15%
+                                    </Button>
+                                </>
+                            )}
+                            {(alertType === 'PRICE_BELOW' || alertType === 'PERCENT_CHANGE_DOWN') && (
+                                <>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={() => applyQuickPercentage(-5)}
+                                    >
+                                        -5%
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={() => applyQuickPercentage(-10)}
+                                    >
+                                        -10%
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={() => applyQuickPercentage(-15)}
+                                    >
+                                        -15%
+                                    </Button>
+                                </>
+                            )}
+                        </div>
                     </div>
                     {targetValue && parseFloat(targetValue) > 0 && (
-                        <div className="rounded-lg bg-muted p-3 text-sm">
-                            <p className="font-medium">Alert Preview:</p>
-                            <p className="text-muted-foreground mt-1">
+                        <div className="rounded-lg bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 p-4 border border-purple-200 dark:border-purple-800">
+                            <p className="font-semibold text-sm mb-2 flex items-center gap-2">
+                                <Bell className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                                Alert Preview
+                            </p>
+                            <p className="text-sm text-foreground">
                                 You'll be notified when {name} {getAlertDescription()}
                             </p>
                         </div>
