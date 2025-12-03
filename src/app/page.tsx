@@ -9,9 +9,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Search, TrendingUp, TrendingDown, Star, Eye, EyeOff, RefreshCw, Activity, Calendar } from 'lucide-react'
+import { Search, TrendingUp, TrendingDown, Star, Eye, EyeOff, RefreshCw, Activity, Calendar, Bell, BarChart3 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
 import { LiveStockTicker } from '@/components/LiveStockTicker'
+import { AlertDialog } from '@/components/AlertDialog'
+import { AlertManager } from '@/components/AlertManager'
+import { AdvancedChart } from '@/components/AdvancedChart'
+import { SectorDashboard } from '@/components/SectorDashboard'
+import { StockComparison } from '@/components/StockComparison'
 import { useToast } from '@/hooks/use-toast'
 
 interface Stock {
@@ -320,9 +325,12 @@ export default function StocksDashboard() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             <Tabs defaultValue="trending" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="trending">Trending</TabsTrigger>
                 <TabsTrigger value="watchlist">Watchlist</TabsTrigger>
+                <TabsTrigger value="alerts"><Bell className="w-4 h-4 mr-1" />Alerts</TabsTrigger>
+                <TabsTrigger value="sectors"><BarChart3 className="w-4 h-4 mr-1" />Sectors</TabsTrigger>
+                <TabsTrigger value="comparison">Compare</TabsTrigger>
               </TabsList>
 
               <TabsContent value="trending" className="space-y-4">
@@ -407,16 +415,35 @@ export default function StocksDashboard() {
                   </CardContent>
                 </Card>
               </TabsContent>
+
+              <TabsContent value="alerts" className="space-y-4">
+                <AlertManager />
+              </TabsContent>
+
+              <TabsContent value="sectors" className="space-y-4">
+                <SectorDashboard />
+              </TabsContent>
+
+              <TabsContent value="comparison" className="space-y-4">
+                <StockComparison />
+              </TabsContent>
             </Tabs>
 
             {/* Stock Details and Chart */}
             {selectedStock && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    {selectedStock.symbol}
-                    <Badge variant="secondary">{selectedStock.name}</Badge>
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      {selectedStock.symbol}
+                      <Badge variant="secondary">{selectedStock.name}</Badge>
+                    </CardTitle>
+                    <AlertDialog
+                      symbol={selectedStock.symbol}
+                      name={selectedStock.name}
+                      currentPrice={selectedStock.price}
+                    />
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="flex items-center justify-between mb-4">
@@ -480,53 +507,10 @@ export default function StocksDashboard() {
                       <p className="text-sm text-muted-foreground">Market Cap</p>
                       <p className="font-semibold">{selectedStock.marketCap}</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">P/E Ratio</p>
-                      <p className="font-semibold">{selectedStock.pe?.toFixed(2) || 'N/A'}</p>
-                    </div>
                   </div>
 
-                  {chartLoading ? (
-                    <Skeleton className="h-64 w-full" />
-                  ) : (
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartData}>
-                          <defs>
-                            <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8} />
-                              <stop offset="95%" stopColor="#8884d8" stopOpacity={0} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis
-                            dataKey="time"
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                          />
-                          <YAxis
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                            tickFormatter={(value) => `₹${value.toFixed(0)}`}
-                          />
-                          <Tooltip
-                            formatter={(value: number) => [`₹${value.toFixed(2)}`, 'Price']}
-                            labelFormatter={(label) => `Time: ${label}`}
-                          />
-                          <Area
-                            type="monotone"
-                            dataKey="price"
-                            stroke="#8884d8"
-                            fillOpacity={1}
-                            fill="url(#colorPrice)"
-                            strokeWidth={2}
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
+                  {/* Advanced Chart with Technical Indicators */}
+                  <AdvancedChart symbol={selectedStock.symbol} period={chartPeriod} />
 
                   {(selectedStock.week52High || selectedStock.week52Low || selectedStock.eps || selectedStock.dividend) && (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

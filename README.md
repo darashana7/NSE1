@@ -99,10 +99,24 @@ npm run dev
 - `GET /api/stocks/details?symbol=SYMBOL&period=PERIOD` - Get detailed stock information and chart data
   - **Periods**: `1d`, `5d`, `1mo`, `3mo`, `6mo`, `1y`
   - **Examples**: `?symbol=INFY.NS&period=1mo` or `?symbol=RELIANCE.NS&period=1y`
+- `GET /api/stocks/indicators?symbol=SYMBOL&period=PERIOD` - Get technical indicators for a stock
+  - Returns SMA, EMA, RSI, MACD, Bollinger Bands
 
 ### Watchlist
 - `GET /api/watchlist` - Get user's watchlist with real-time data
 - `POST /api/watchlist/toggle` - Add/remove stock from watchlist
+
+### Alerts
+- `POST /api/alert/create` - Create a new price alert
+- `GET /api/alert/list?status=STATUS` - List all alerts (active, triggered, or all)
+- `DELETE /api/alert/delete?id=ID` - Delete an alert
+- `PATCH /api/alert/delete` - Update alert status (pause/activate)
+- `GET /api/alert/check` - Check all active alerts (background service)
+
+### Sectors
+- `GET /api/sectors/list` - Get all sectors with stock counts
+- `GET /api/sectors/performance?sectorId=ID` - Get sector performance metrics
+- `GET /api/sectors/compare?symbols=SYM1,SYM2,SYM3&period=PERIOD` - Compare multiple stocks
 
 ## Stock Symbols
 
@@ -200,15 +214,55 @@ This application uses **Yahoo Finance API** to fetch real-time stock data:
 - **Data Validation**: Type-safe data handling
 - **Rate Limiting**: Respectful API usage patterns
 
+## Advanced Features
+
+### 🔔 Stock Price Alerts & Notifications
+- **Create Custom Alerts**: Set price thresholds or percentage change alerts
+- **Multiple Alert Types**:
+  - Price reaches above a target
+  - Price drops below a target
+  - Percentage increase alerts
+  - Percentage decrease alerts
+- **Alert Management**: View, pause, delete, and track triggered alerts
+- **Real-time Notifications**: Get notified via toast when alerts trigger
+- **Persistent Storage**: Alerts saved in database for reliability
+
+### 📊 Advanced Charting with Technical Indicators
+- **Multiple Chart Types**: Switch between Area and Line charts
+- **Technical Indicators**:
+  - **SMA (Simple Moving Average)**: 20, 50, and 200-day periods
+  - **EMA (Exponential Moving Average)**: 12 and 26-day periods
+  - **RSI (Relative Strength Index)**: 14-day with overbought/oversold zones
+  - **MACD**: Moving Average Convergence Divergence
+  - **Bollinger Bands**: 20-day with upper and lower bands
+- **Interactive Controls**: Toggle indicators on/off with switches
+- **Responsive Charts**: Optimized for all screen sizes
+- **Separate RSI Chart**: Dedicated chart for RSI with reference lines
+
+### 🏢 Sector-wise Analysis & Comparison
+- **Sector Performance Dashboard**: Real-time metrics for 10 major sectors
+  - Technology, Banking & Finance, Pharma & Healthcare
+  - Auto & Industrial, Consumer Goods, Energy & Power
+  - Real Estate & Infrastructure, Telecommunications
+  - Metals & Mining, Diversified
+- **Performance Heatmap**: Visual color-coded sector performance
+- **Top Gainers & Losers**: Per-sector breakdown
+- **Stock Comparison Tool**:
+  - Compare up to 6 stocks side-by-side
+  - Normalized performance charts (base 100)
+  - Period performance metrics
+  - Interactive comparison table
+
 ## Future Enhancements
 
+- [x] Stock price alerts and notifications
+- [x] Advanced charting with technical indicators
+- [x] Sector-wise analysis and comparison
 - [ ] User authentication and persistent watchlists
 - [ ] Portfolio tracking with real P&L
-- [ ] Stock price alerts and notifications
-- [ ] Advanced charting with technical indicators
-- [ ] Sector-wise analysis and comparison
 - [ ] International market support
 - [ ] WebSocket integration for true real-time updates
+- [ ] Export data and charts
 
 ## Contributing
 

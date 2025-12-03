@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,19 +11,58 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
+  id        String      @id @default(cuid())
+  email     String      @unique
   name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  watchlist Watchlist[]
+  alerts    Alert[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 }
 
-model Post {
+model Watchlist {
+  id      String   @id @default(cuid())
+  userId  String?
+  symbol  String
+  name    String
+  addedAt DateTime @default(now())
+  user    User?    @relation(fields: [userId], references: [id])
+
+  @@unique([userId, symbol])
+}
+
+model Alert {
+  id           String    @id @default(cuid())
+  userId       String?
+  symbol       String
+  name         String
+  alertType    String // 'PRICE_ABOVE', 'PRICE_BELOW', 'PERCENT_CHANGE_UP', 'PERCENT_CHANGE_DOWN'
+  targetValue  Float
+  currentValue Float?
+  isActive     Boolean   @default(true)
+  isTriggered  Boolean   @default(false)
+  triggeredAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  user         User?     @relation(fields: [userId], references: [id])
+}
+
+model Sector {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  stocks      Stock[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Stock {
   id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+  symbol    String   @unique
+  name      String
+  sectorId  String
+  sector    Sector   @relation(fields: [sectorId], references: [id])
+  marketCap Float?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
