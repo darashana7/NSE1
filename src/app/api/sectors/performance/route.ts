@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 // Helper to fetch current stock prices
-async function getStockPrices(symbols: string[]) {
+async function getStockPrices(symbols: string[], baseUrl: string) {
     const prices: { [key: string]: any } = {}
 
     try {
@@ -10,7 +10,7 @@ async function getStockPrices(symbols: string[]) {
         const pricePromises = symbols.map(async (symbol) => {
             try {
                 const response = await fetch(
-                    `http://localhost:3000/api/stocks/details?symbol=${symbol}&period=1d`,
+                    `${baseUrl}/api/stocks/details?symbol=${symbol}&period=1d`,
                     { cache: 'no-store' }
                 )
                 const data = await response.json()
@@ -36,6 +36,11 @@ async function getStockPrices(symbols: string[]) {
 
 export async function GET(request: NextRequest) {
     try {
+        // Get base URL from request
+        const protocol = request.headers.get('x-forwarded-proto') || 'http'
+        const host = request.headers.get('host') || 'localhost:3000'
+        const baseUrl = `${protocol}://${host}`
+
         const { searchParams } = new URL(request.url)
         const sectorId = searchParams.get('sectorId')
         const sectorName = searchParams.get('sectorName')
@@ -67,7 +72,7 @@ export async function GET(request: NextRequest) {
         const sectorPerformance = await Promise.all(
             sectors.map(async (sector) => {
                 const symbols = sector.stocks.map((stock) => stock.symbol)
-                const prices = await getStockPrices(symbols)
+                const prices = await getStockPrices(symbols, baseUrl)
 
                 // Calculate sector metrics
                 const stocksWithPrices = Object.entries(prices)
