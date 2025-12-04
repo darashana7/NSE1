@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 // Helper to fetch stock data with historical prices
-async function getStockData(symbol: string, period: string) {
+async function getStockData(symbol: string, period: string, baseUrl: string) {
     try {
         const response = await fetch(
-            `http://localhost:3000/api/stocks/details?symbol=${symbol}&period=${period}`,
+            `${baseUrl}/api/stocks/details?symbol=${symbol}&period=${period}`,
             { cache: 'no-store' }
         )
         const data = await response.json()
@@ -49,6 +49,11 @@ function normalizeChartData(
 
 export async function GET(request: NextRequest) {
     try {
+        // Get base URL from request
+        const protocol = request.headers.get('x-forwarded-proto') || 'http'
+        const host = request.headers.get('host') || 'localhost:3000'
+        const baseUrl = `${protocol}://${host}`
+
         const { searchParams } = new URL(request.url)
         const symbolsParam = searchParams.get('symbols')
         const period = searchParams.get('period') || '1mo'
@@ -78,7 +83,7 @@ export async function GET(request: NextRequest) {
 
         // Fetch data for all symbols
         const stockDataPromises = symbols.map(async (symbol) => {
-            const data = await getStockData(symbol, period)
+            const data = await getStockData(symbol, period, baseUrl)
             if (data && data.stock && data.chartData) {
                 return {
                     symbol: data.stock.symbol,

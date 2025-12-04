@@ -1,34 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { SECTORS_DATA, SectorData } from '@/lib/sectorsData'
 
-// Helper to fetch current stock prices
-async function getStockPrices(symbols: string[], baseUrl: string) {
-    const prices: { [key: string]: any } = {}
-
+// Helper to fetch current stock prices from Yahoo Finance
+async function getStockPrice(symbol: string) {
     try {
-        // Fetch prices for all symbols
-        const pricePromises = symbols.map(async (symbol) => {
-            try {
-                const response = await fetch(
-                    `${baseUrl}/api/stocks/details?symbol=${symbol}&period=1d`,
-                    { cache: 'no-store' }
-                )
-                const data = await response.json()
-                if (data.stock) {
-                    prices[symbol] = {
-                        price: data.stock.price,
-                        change: data.stock.change,
-                        changePercent: data.stock.changePercent,
-                    }
-                }
-            } catch (error) {
-                console.error(`Error fetching price for ${symbol}:`, error)
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`
+        const response = await fetch(url, {
+            cache: 'no-store',
+            headers: {
+                'User-Agent': 'Mozilla/5.0'
             }
         })
 
-        await Promise.all(pricePromises)
+        if (response.ok) {
+            const data = await response.json()
+            const result = data.chart?.result?.[0]
+
+            if (result && result.meta) {
+                const meta = result.meta
+                const currentPrice = meta.regularMarketPrice
+                const previousClose = meta.previousClose || meta.chartPreviousClose || currentPrice
+
+                // Calculate change manually (Yahoo Finance returns 0 when market is closed)
+                const change = currentPrice - previousClose
+                const changePercent = previousClose !== 0 ? (change / previousClose) * 100 : 0
+
+                return {
+                    price: parseFloat(currentPrice.toFixed(2)),
+                    change: parseFloat(change.toFixed(2)),
+                    changePercent: parseFloat(changePercent.toFixed(2)),
+                }
+            }
+        }
     } catch (error) {
-        console.error('Error fetching stock prices:', error)
+        console.error(`Error fetching price for ${symbol}:`, error)
+    }
+
+    return null
+}
+
+// Helper to fetch prices for multiple stocks with timeout
+async function getStockPrices(stocks: { symbol: string; name: string }[]) {
+    const prices: { [key: string]: any } = {}
+
+    // Limit to first 5 stocks per sector for better performance
+    const limitedStocks = stocks.slice(0, 5)
+
+    // Process stocks one at a time with longer timeout
+    for (const stock of limitedStocks) {
+        try {
+            // Add timeout for each request
+            const timeoutPromise = new Promise<null>((_, reject) =>
+                setTimeout(() => reject(new Error('Timeout')), 5000)
+            )
+            const fetchPromise = getStockPrice(stock.symbol)
+            const priceData = await Promise.race([fetchPromise, timeoutPromise])
+
+            if (priceData) {
+                prices[stock.symbol] = {
+                    ...priceData,
+                    name: stock.name,
+                }
+            }
+        } catch (error) {
+            console.error(`Failed to fetch ${stock.symbol}:`, error)
+        }
     }
 
     return prices
@@ -36,30 +72,21 @@ async function getStockPrices(symbols: string[], baseUrl: string) {
 
 export async function GET(request: NextRequest) {
     try {
-        // Get base URL from request
-        const protocol = request.headers.get('x-forwarded-proto') || 'http'
-        const host = request.headers.get('host') || 'localhost:3000'
-        const baseUrl = `${protocol}://${host}`
-
         const { searchParams } = new URL(request.url)
         const sectorId = searchParams.get('sectorId')
         const sectorName = searchParams.get('sectorName')
 
-        let whereClause: any = {}
+        // Use static sectors data (no database required)
+        let sectors: SectorData[] = [...SECTORS_DATA]
 
+        // Filter by sector if specified
         if (sectorId) {
-            whereClause.id = sectorId
+            sectors = sectors.filter((s) => s.id === sectorId)
         } else if (sectorName) {
-            whereClause.name = sectorName
+            sectors = sectors.filter(
+                (s) => s.name.toLowerCase() === sectorName.toLowerCase()
+            )
         }
-
-        // Fetch sectors with stocks
-        const sectors = await prisma.sector.findMany({
-            where: Object.keys(whereClause).length > 0 ? whereClause : undefined,
-            include: {
-                stocks: true,
-            },
-        })
 
         if (sectors.length === 0) {
             return NextResponse.json(
@@ -71,10 +98,7 @@ export async function GET(request: NextRequest) {
         // Calculate performance for each sector
         const sectorPerformance = await Promise.all(
             sectors.map(async (sector) => {
-                const symbols = sector.stocks.map((stock) => stock.symbol)
-                const prices = await getStockPrices(symbols, baseUrl)
-
-                // Calculate sector metrics
+                const prices = await getStockPrices(sector.stocks)
                 const stocksWithPrices = Object.entries(prices)
                 const totalStocks = stocksWithPrices.length
 
@@ -108,20 +132,17 @@ export async function GET(request: NextRequest) {
 
                 // Find top gainers and losers
                 const stockPerformance = stocksWithPrices
-                    .map(([symbol, data]) => {
-                        const stock = sector.stocks.find((s) => s.symbol === symbol)
-                        return {
-                            symbol,
-                            name: stock?.name || symbol,
-                            price: data.price,
-                            change: data.change,
-                            changePercent: data.changePercent,
-                        }
-                    })
+                    .map(([symbol, data]) => ({
+                        symbol,
+                        name: data.name || symbol,
+                        price: data.price,
+                        change: data.change,
+                        changePercent: data.changePercent,
+                    }))
                     .sort((a, b) => b.changePercent - a.changePercent)
 
-                const topGainers = stockPerformance.slice(0, 5)
-                const topLosers = stockPerformance.slice(-5).reverse()
+                const topGainers = stockPerformance.filter(s => s.changePercent > 0).slice(0, 5)
+                const topLosers = stockPerformance.filter(s => s.changePercent < 0).slice(-5).reverse()
 
                 return {
                     id: sector.id,
@@ -129,7 +150,7 @@ export async function GET(request: NextRequest) {
                     description: sector.description,
                     totalStocks: sector.stocks.length,
                     avgChange: 0,
-                    avgChangePercent,
+                    avgChangePercent: parseFloat(avgChangePercent.toFixed(2)),
                     gainers,
                     losers,
                     topGainers,

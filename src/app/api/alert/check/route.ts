@@ -1,18 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getAlerts, updateAlert, Alert } from '@/lib/alertsStore'
 
-// Helper function to fetch current stock price
+// Helper function to fetch current stock price directly from Yahoo Finance
 async function getCurrentPrice(symbol: string): Promise<number | null> {
     try {
-        const response = await fetch(
-            `http://localhost:3000/api/stocks/details?symbol=${symbol}&period=1d`
-        )
-        const data = await response.json()
-        return data.stock?.price || null
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`
+        const response = await fetch(url, {
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        })
+
+        if (response.ok) {
+            const data = await response.json()
+            const result = data.chart?.result?.[0]
+            if (result?.meta?.regularMarketPrice) {
+                return result.meta.regularMarketPrice
+            }
+        }
     } catch (error) {
         console.error(`Error fetching price for ${symbol}:`, error)
-        return null
     }
+    return null
 }
 
 // Check if an alert should be triggered
@@ -43,15 +50,10 @@ function shouldTrigger(
 
 export async function GET(request: NextRequest) {
     try {
-        // Fetch all active alerts
-        const activeAlerts = await prisma.alert.findMany({
-            where: {
-                isActive: true,
-                isTriggered: false,
-            },
-        })
+        // Fetch all active alerts from in-memory store
+        const activeAlerts = getAlerts('active')
 
-        const triggeredAlerts: any[] = []
+        const triggeredAlerts: Alert[] = []
 
         // Check each alert
         for (const alert of activeAlerts) {
@@ -68,23 +70,19 @@ export async function GET(request: NextRequest) {
 
             if (shouldTriggerAlert) {
                 // Update alert as triggered
-                const updatedAlert = await prisma.alert.update({
-                    where: { id: alert.id },
-                    data: {
-                        isTriggered: true,
-                        triggeredAt: new Date(),
-                        currentValue: currentPrice,
-                    },
+                const updatedAlert = updateAlert(alert.id, {
+                    isTriggered: true,
+                    triggeredAt: new Date().toISOString(),
+                    currentValue: currentPrice,
                 })
 
-                triggeredAlerts.push(updatedAlert)
+                if (updatedAlert) {
+                    triggeredAlerts.push(updatedAlert)
+                }
             } else {
                 // Update current value for percentage change alerts
-                await prisma.alert.update({
-                    where: { id: alert.id },
-                    data: {
-                        currentValue: currentPrice,
-                    },
+                updateAlert(alert.id, {
+                    currentValue: currentPrice,
                 })
             }
         }

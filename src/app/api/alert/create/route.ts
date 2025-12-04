@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createAlert, Alert } from '@/lib/alertsStore'
 
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json()
-        const { symbol, name, alertType, targetValue, userId } = body
+        const { symbol, name, alertType, targetValue } = body
 
         // Validate input
         if (!symbol || !name || !alertType || targetValue === undefined) {
@@ -28,17 +28,21 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Create the alert
-        const alert = await prisma.alert.create({
-            data: {
-                symbol,
-                name,
-                alertType,
-                targetValue: parseFloat(targetValue),
-                userId: userId || null,
-                isActive: true,
-                isTriggered: false,
-            },
+        // Validate target value
+        const parsedValue = parseFloat(targetValue)
+        if (isNaN(parsedValue) || parsedValue <= 0) {
+            return NextResponse.json(
+                { error: 'Target value must be a positive number' },
+                { status: 400 }
+            )
+        }
+
+        // Create the alert using in-memory store
+        const alert = createAlert({
+            symbol,
+            name,
+            alertType: alertType as Alert['alertType'],
+            targetValue: parsedValue,
         })
 
         return NextResponse.json({

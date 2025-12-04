@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { deleteAlert, updateAlert, getAlertById } from '@/lib/alertsStore'
 
 export async function DELETE(request: NextRequest) {
     try {
@@ -13,12 +13,17 @@ export async function DELETE(request: NextRequest) {
             )
         }
 
+        // Check if alert exists
+        const existingAlert = getAlertById(alertId)
+        if (!existingAlert) {
+            return NextResponse.json(
+                { error: 'Alert not found' },
+                { status: 404 }
+            )
+        }
+
         // Delete the alert
-        await prisma.alert.delete({
-            where: {
-                id: alertId,
-            },
-        })
+        deleteAlert(alertId)
 
         return NextResponse.json({
             success: true,
@@ -45,14 +50,18 @@ export async function PATCH(request: NextRequest) {
             )
         }
 
+        // Check if alert exists
+        const existingAlert = getAlertById(alertId)
+        if (!existingAlert) {
+            return NextResponse.json(
+                { error: 'Alert not found' },
+                { status: 404 }
+            )
+        }
+
         // Update the alert
-        const updatedAlert = await prisma.alert.update({
-            where: {
-                id: alertId,
-            },
-            data: {
-                isActive: isActive !== undefined ? isActive : undefined,
-            },
+        const updatedAlert = updateAlert(alertId, {
+            isActive: isActive !== undefined ? isActive : existingAlert.isActive,
         })
 
         return NextResponse.json({

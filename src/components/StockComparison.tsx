@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
     Card,
     CardContent,
@@ -29,7 +29,8 @@ import {
     ResponsiveContainer,
     Legend,
 } from 'recharts'
-import { TrendingUp, TrendingDown, X } from 'lucide-react'
+import { TrendingUp, TrendingDown, X, Plus, Search, AlertCircle, GitCompare } from 'lucide-react'
+import { useToast } from '@/hooks/use-toast'
 
 interface StockMetric {
     symbol: string
@@ -40,49 +41,107 @@ interface StockMetric {
     performance: number
 }
 
-const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1', '#d084d0']
+interface WatchlistItem {
+    symbol: string
+    name: string
+}
+
+const COLORS = ['#8b5cf6', '#ec4899', '#06b6d4', '#f59e0b', '#10b981', '#ef4444']
+
+// Popular stocks for suggestions
+const POPULAR_STOCKS = [
+    { symbol: 'RELIANCE.NS', name: 'Reliance Industries' },
+    { symbol: 'TCS.NS', name: 'Tata Consultancy Services' },
+    { symbol: 'HDFCBANK.NS', name: 'HDFC Bank' },
+    { symbol: 'INFY.NS', name: 'Infosys' },
+    { symbol: 'ICICIBANK.NS', name: 'ICICI Bank' },
+    { symbol: 'SBIN.NS', name: 'State Bank of India' },
+    { symbol: 'TATAMOTORS.NS', name: 'Tata Motors' },
+    { symbol: 'WIPRO.NS', name: 'Wipro' },
+    { symbol: 'MARUTI.NS', name: 'Maruti Suzuki' },
+    { symbol: 'BAJFINANCE.NS', name: 'Bajaj Finance' },
+]
 
 export function StockComparison() {
+    const { toast } = useToast()
     const [symbols, setSymbols] = useState<string[]>([])
     const [inputSymbol, setInputSymbol] = useState('')
     const [period, setPeriod] = useState('1mo')
     const [comparisonData, setComparisonData] = useState<any>(null)
     const [loading, setLoading] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [watchlistStocks, setWatchlistStocks] = useState<WatchlistItem[]>([])
 
-    const addSymbol = () => {
-        if (!inputSymbol.trim()) return
+    // Load watchlist stocks for suggestions
+    useEffect(() => {
+        loadWatchlist()
+    }, [])
 
-        const formattedSymbol = inputSymbol.toUpperCase().includes('.NS')
-            ? inputSymbol.toUpperCase()
-            : `${inputSymbol.toUpperCase()}.NS`
+    const loadWatchlist = async () => {
+        try {
+            const response = await fetch('/api/watchlist')
+            if (response.ok) {
+                const data = await response.json()
+                setWatchlistStocks(data)
+            }
+        } catch (error) {
+            console.error('Error loading watchlist:', error)
+        }
+    }
+
+    const addSymbol = (symbolToAdd?: string) => {
+        const symbol = symbolToAdd || inputSymbol.trim()
+        if (!symbol) return
+
+        const formattedSymbol = symbol.toUpperCase().includes('.NS')
+            ? symbol.toUpperCase()
+            : `${symbol.toUpperCase()}.NS`
 
         if (symbols.includes(formattedSymbol)) {
+            toast({
+                title: 'Stock already added',
+                description: `${formattedSymbol.replace('.NS', '')} is already in the comparison list`,
+                variant: 'destructive',
+                duration: 2000,
+            })
             return
         }
 
         if (symbols.length >= 6) {
-            alert('Maximum 6 stocks can be compared at once')
+            toast({
+                title: 'Maximum reached',
+                description: 'Maximum 6 stocks can be compared at once',
+                variant: 'destructive',
+                duration: 2000,
+            })
             return
         }
 
         setSymbols([...symbols, formattedSymbol])
         setInputSymbol('')
+        setComparisonData(null) // Clear old comparison
     }
 
     const removeSymbol = (symbol: string) => {
         setSymbols(symbols.filter((s) => s !== symbol))
-        if (symbols.length <= 1) {
+        if (symbols.length <= 2) {
             setComparisonData(null)
         }
     }
 
     const compareStocks = async () => {
         if (symbols.length < 2) {
-            alert('Please add at least 2 stocks to compare')
+            toast({
+                title: 'Add more stocks',
+                description: 'Please add at least 2 stocks to compare',
+                variant: 'destructive',
+                duration: 2000,
+            })
             return
         }
 
         setLoading(true)
+        setError(null)
 
         try {
             const response = await fetch(
@@ -92,57 +151,137 @@ export function StockComparison() {
 
             if (response.ok) {
                 setComparisonData(data)
+                toast({
+                    title: '✓ Comparison Ready',
+                    description: `Comparing ${data.comparedStocks} stocks over ${period}`,
+                    duration: 2000,
+                })
             } else {
-                alert(data.error || 'Failed to load comparison data')
+                setError(data.error || 'Failed to load comparison data')
+                toast({
+                    title: 'Error',
+                    description: data.error || 'Failed to load comparison data',
+                    variant: 'destructive',
+                    duration: 3000,
+                })
             }
         } catch (error) {
             console.error('Error comparing stocks:', error)
-            alert('An error occurred while comparing stocks')
+            setError('An error occurred while comparing stocks')
+            toast({
+                title: 'Error',
+                description: 'An error occurred while comparing stocks',
+                variant: 'destructive',
+                duration: 3000,
+            })
         } finally {
             setLoading(false)
         }
     }
 
+    const quickAddFromWatchlist = () => {
+        if (watchlistStocks.length === 0) return
+
+        const stocksToAdd = watchlistStocks.slice(0, Math.min(4, watchlistStocks.length))
+        const newSymbols = stocksToAdd
+            .map(s => s.symbol)
+            .filter(s => !symbols.includes(s))
+            .slice(0, 6 - symbols.length)
+
+        setSymbols([...symbols, ...newSymbols])
+    }
+
     return (
         <div className="space-y-6">
-            <Card>
+            {/* Input Card */}
+            <Card className="gradient-purple-subtle">
                 <CardHeader>
-                    <CardTitle>Stock Comparison Tool</CardTitle>
-                    <CardDescription>
-                        Add stocks to compare their performance side-by-side
-                    </CardDescription>
+                    <div className="flex items-center gap-3">
+                        <GitCompare className="w-8 h-8 text-purple-600" />
+                        <div>
+                            <CardTitle className="text-2xl">Stock Comparison Tool</CardTitle>
+                            <CardDescription>
+                                Add stocks to compare their performance side-by-side
+                            </CardDescription>
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
+                        {/* Add Stock Input */}
                         <div className="flex gap-2">
-                            <Input
-                                placeholder="Enter stock symbol (e.g., RELIANCE, TCS)"
-                                value={inputSymbol}
-                                onChange={(e) => setInputSymbol(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && addSymbol()}
-                            />
-                            <Button onClick={addSymbol}>Add Stock</Button>
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Enter stock symbol (e.g., RELIANCE, TCS)"
+                                    value={inputSymbol}
+                                    onChange={(e) => setInputSymbol(e.target.value.toUpperCase())}
+                                    onKeyPress={(e) => e.key === 'Enter' && addSymbol()}
+                                    className="pl-10"
+                                />
+                            </div>
+                            <Button onClick={() => addSymbol()} className="gradient-purple">
+                                <Plus className="w-4 h-4 mr-2" />
+                                Add Stock
+                            </Button>
                         </div>
 
-                        <div className="flex flex-wrap gap-2">
-                            {symbols.map((symbol) => (
-                                <Badge
-                                    key={symbol}
-                                    variant="secondary"
-                                    className="px-3 py-1 text-sm"
-                                >
-                                    {symbol.replace('.NS', '')}
-                                    <button
-                                        onClick={() => removeSymbol(symbol)}
-                                        className="ml-2 hover:text-red-600"
+                        {/* Quick Add Buttons */}
+                        <div className="space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm text-muted-foreground">Quick Add:</span>
+                                {POPULAR_STOCKS.slice(0, 6).map((stock) => (
+                                    <Button
+                                        key={stock.symbol}
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={symbols.includes(stock.symbol)}
+                                        onClick={() => addSymbol(stock.symbol)}
+                                        className="text-xs"
                                     >
-                                        <X className="w-3 h-3" />
-                                    </button>
-                                </Badge>
-                            ))}
+                                        {stock.symbol.replace('.NS', '')}
+                                    </Button>
+                                ))}
+                                {watchlistStocks.length > 0 && (
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={quickAddFromWatchlist}
+                                        className="text-xs"
+                                    >
+                                        + From Watchlist
+                                    </Button>
+                                )}
+                            </div>
                         </div>
 
-                        <div className="flex gap-2">
+                        {/* Selected Stocks */}
+                        <div className="flex flex-wrap gap-2 min-h-[40px]">
+                            {symbols.length === 0 ? (
+                                <span className="text-sm text-muted-foreground py-2">
+                                    No stocks selected. Add at least 2 stocks to compare.
+                                </span>
+                            ) : (
+                                symbols.map((symbol, index) => (
+                                    <Badge
+                                        key={symbol}
+                                        className="px-3 py-1.5 text-sm flex items-center gap-2"
+                                        style={{ backgroundColor: COLORS[index], color: 'white' }}
+                                    >
+                                        {symbol.replace('.NS', '')}
+                                        <button
+                                            onClick={() => removeSymbol(symbol)}
+                                            className="hover:opacity-75 transition-opacity"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </Badge>
+                                ))
+                            )}
+                        </div>
+
+                        {/* Period Selection and Compare Button */}
+                        <div className="flex gap-2 flex-wrap">
                             <Select value={period} onValueChange={setPeriod}>
                                 <SelectTrigger className="w-[150px]">
                                     <SelectValue />
@@ -160,42 +299,76 @@ export function StockComparison() {
                             <Button
                                 onClick={compareStocks}
                                 disabled={symbols.length < 2 || loading}
+                                className="gradient-purple min-w-[150px]"
                             >
-                                {loading ? 'Comparing...' : 'Compare Stocks'}
+                                {loading ? (
+                                    <>
+                                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                                        Comparing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <GitCompare className="w-4 h-4 mr-2" />
+                                        Compare Stocks
+                                    </>
+                                )}
                             </Button>
                         </div>
                     </div>
                 </CardContent>
             </Card>
 
-            {loading && <Skeleton className="h-[400px] w-full" />}
+            {/* Loading State */}
+            {loading && (
+                <div className="space-y-4">
+                    <Skeleton className="h-[200px] w-full rounded-xl" />
+                    <Skeleton className="h-[400px] w-full rounded-xl" />
+                </div>
+            )}
 
-            {comparisonData && !loading && (
+            {/* Error State */}
+            {error && !loading && (
+                <Card className="border-destructive/50">
+                    <CardContent className="py-8">
+                        <div className="text-center">
+                            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-destructive" />
+                            <h3 className="text-lg font-semibold mb-2">Comparison Failed</h3>
+                            <p className="text-muted-foreground">{error}</p>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Comparison Results */}
+            {comparisonData && !loading && !error && (
                 <>
                     {/* Comparison Metrics Table */}
-                    <Card>
+                    <Card className="card-hover">
                         <CardHeader>
                             <CardTitle>Performance Metrics</CardTitle>
+                            <CardDescription>
+                                Comparison over {period === '1d' ? '1 Day' : period === '5d' ? '5 Days' : period === '1mo' ? '1 Month' : period === '3mo' ? '3 Months' : period === '6mo' ? '6 Months' : '1 Year'}
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="overflow-x-auto">
                                 <table className="w-full">
                                     <thead>
                                         <tr className="border-b">
-                                            <th className="text-left p-2">Stock</th>
-                                            <th className="text-right p-2">Current Price</th>
-                                            <th className="text-right p-2">Day Change</th>
-                                            <th className="text-right p-2">Period Performance</th>
+                                            <th className="text-left p-3 font-semibold">Stock</th>
+                                            <th className="text-right p-3 font-semibold">Current Price</th>
+                                            <th className="text-right p-3 font-semibold">Day Change</th>
+                                            <th className="text-right p-3 font-semibold">Period Performance</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {comparisonData.stocks.map(
                                             (stock: StockMetric, index: number) => (
-                                                <tr key={stock.symbol} className="border-b hover:bg-muted/50">
-                                                    <td className="p-2">
-                                                        <div className="flex items-center gap-2">
+                                                <tr key={stock.symbol} className="border-b hover:bg-muted/50 transition-colors">
+                                                    <td className="p-3">
+                                                        <div className="flex items-center gap-3">
                                                             <div
-                                                                className="w-3 h-3 rounded-full"
+                                                                className="w-4 h-4 rounded-full"
                                                                 style={{ backgroundColor: COLORS[index] }}
                                                             />
                                                             <div>
@@ -208,10 +381,10 @@ export function StockComparison() {
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td className="text-right p-2 font-semibold">
+                                                    <td className="text-right p-3 font-semibold">
                                                         ₹{stock.currentPrice.toFixed(2)}
                                                     </td>
-                                                    <td className="text-right p-2">
+                                                    <td className="text-right p-3">
                                                         <span
                                                             className={
                                                                 stock.changePercent >= 0
@@ -223,7 +396,7 @@ export function StockComparison() {
                                                             {stock.changePercent.toFixed(2)}%
                                                         </span>
                                                     </td>
-                                                    <td className="text-right p-2">
+                                                    <td className="text-right p-3">
                                                         <Badge
                                                             className={
                                                                 stock.performance >= 0
@@ -250,21 +423,35 @@ export function StockComparison() {
                     </Card>
 
                     {/* Normalized Comparison Chart */}
-                    <Card>
+                    <Card className="card-hover">
                         <CardHeader>
                             <CardTitle>Normalized Performance Chart</CardTitle>
                             <CardDescription>
-                                All stocks start at 100 for easy comparison. Period: {period}
+                                All stocks start at 100 for easy comparison. Higher values indicate better performance.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="h-[400px]">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <LineChart data={comparisonData.normalizedChart}>
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="time" fontSize={12} />
-                                        <YAxis fontSize={12} />
-                                        <Tooltip />
+                                        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                                        <XAxis
+                                            dataKey="time"
+                                            fontSize={12}
+                                            tick={{ fill: 'currentColor' }}
+                                        />
+                                        <YAxis
+                                            fontSize={12}
+                                            tick={{ fill: 'currentColor' }}
+                                            domain={['dataMin - 5', 'dataMax + 5']}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: 'hsl(var(--background))',
+                                                border: '1px solid hsl(var(--border))',
+                                                borderRadius: '8px',
+                                            }}
+                                        />
                                         <Legend />
                                         {comparisonData.stocks.map(
                                             (stock: StockMetric, index: number) => (
