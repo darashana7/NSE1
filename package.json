@@ -5,12 +5,14 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build && powershell -Command \"Copy-Item -Recurse -Force .next/static .next/standalone/.next/\" && powershell -Command \"Copy-Item -Recurse -Force public .next/standalone/\"",
+    "postbuild": "prisma generate",
     "start": "NODE_ENV=production node .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:reset": "prisma migrate reset"
+    "db:reset": "prisma migrate reset",
+    "db:init": "tsx src/scripts/init-db.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
