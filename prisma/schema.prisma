@@ -10,67 +10,342 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
 model User {
-  id           String      @id @default(cuid())
-  telegramId   String      @unique
-  phoneNumber  String      @unique
+  id           String   @id @default(cuid())
+  telegramId   String   @unique
+  phoneNumber  String   @unique
   passwordHash String
-  email        String?     @unique
+  email        String?  @unique
   name         String?
-  isVerified   Boolean     @default(false)
+  avatar       String?  // Profile picture URL
+  isVerified   Boolean  @default(false)
   verifyCode   String?
   verifyExpiry DateTime?
-  rememberMe   Boolean     @default(false)
+  rememberMe   Boolean  @default(false)
   lastLogin    DateTime?
-  watchlist    Watchlist[]
-  alerts       Alert[]
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  isActive     Boolean  @default(true)  // Account status
+  
+  // Relationships
+  watchlist            Watchlist[]
+  alerts               Alert[]
+  alertHistory         AlertHistory[]
+  searchHistory        SearchHistory[]
+  sessions             Session[]
+  notificationSettings NotificationSettings?
+  portfolios           Portfolio[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([telegramId])
+  @@index([phoneNumber])
 }
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  token        String   @unique
+  deviceInfo   String?  // Browser/device information
+  ipAddress    String?
+  isActive     Boolean  @default(true)
+  lastActivity DateTime @default(now())
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model NotificationSettings {
+  id                    String  @id @default(cuid())
+  userId                String  @unique
+  telegramAlerts        Boolean @default(true)
+  priceAlerts           Boolean @default(true)
+  dailyDigest           Boolean @default(false)
+  weeklyReport          Boolean @default(false)
+  marketOpenAlert       Boolean @default(false)
+  marketCloseAlert      Boolean @default(false)
+  portfolioUpdateAlert  Boolean @default(true)
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// WATCHLIST & PORTFOLIO
+// ============================================
 
 model Watchlist {
-  id      String   @id @default(cuid())
-  userId  String?
-  symbol  String
-  name    String
-  addedAt DateTime @default(now())
-  user    User?    @relation(fields: [userId], references: [id])
+  id        String   @id @default(cuid())
+  userId    String
+  symbol    String
+  name      String
+  notes     String?  // User notes about the stock
+  priority  Int      @default(0)  // For ordering
+  addedAt   DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, symbol])
+  @@index([userId])
 }
 
-model Alert {
-  id           String    @id @default(cuid())
-  userId       String?
-  symbol       String
+model Portfolio {
+  id           String            @id @default(cuid())
+  userId       String
   name         String
-  alertType    String // 'PRICE_ABOVE', 'PRICE_BELOW', 'PERCENT_CHANGE_UP', 'PERCENT_CHANGE_DOWN'
-  targetValue  Float
-  currentValue Float?
-  isActive     Boolean   @default(true)
-  isTriggered  Boolean   @default(false)
-  triggeredAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  user         User?     @relation(fields: [userId], references: [id])
+  description  String?
+  isDefault    Boolean           @default(false)
+  holdings     PortfolioHolding[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([userId])
 }
+
+model PortfolioHolding {
+  id            String   @id @default(cuid())
+  portfolioId   String
+  symbol        String
+  name          String
+  quantity      Float
+  avgBuyPrice   Float
+  currentPrice  Float?
+  profitLoss    Float?
+  profitLossPct Float?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@unique([portfolioId, symbol])
+  @@index([portfolioId])
+}
+
+// ============================================
+// ALERTS
+// ============================================
+
+model Alert {
+  id            String         @id @default(cuid())
+  userId        String
+  symbol        String
+  name          String
+  alertType     AlertType
+  targetValue   Float
+  currentValue  Float?
+  condition     String?        // Additional condition details
+  message       String?        // Custom alert message
+  isActive      Boolean        @default(true)
+  isTriggered   Boolean        @default(false)
+  triggeredAt   DateTime?
+  triggerCount  Int            @default(0)  // How many times triggered
+  repeatAlert   Boolean        @default(false)  // Should alert repeat?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  history AlertHistory[]
+
+  @@index([userId])
+  @@index([symbol])
+  @@index([isActive])
+}
+
+model AlertHistory {
+  id            String   @id @default(cuid())
+  alertId       String
+  userId        String
+  symbol        String
+  alertType     AlertType
+  targetValue   Float
+  triggeredValue Float
+  message       String?
+  notificationSent Boolean @default(false)
+  
+  triggeredAt DateTime @default(now())
+  
+  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([alertId])
+  @@index([userId])
+  @@index([triggeredAt])
+}
+
+enum AlertType {
+  PRICE_ABOVE
+  PRICE_BELOW
+  PERCENT_CHANGE_UP
+  PERCENT_CHANGE_DOWN
+  VOLUME_SPIKE
+  DAILY_HIGH
+  DAILY_LOW
+  FIFTY_TWO_WEEK_HIGH
+  FIFTY_TWO_WEEK_LOW
+}
+
+// ============================================
+// SEARCH HISTORY
+// ============================================
+
+model SearchHistory {
+  id         String     @id @default(cuid())
+  userId     String
+  query      String     // Search query
+  searchType SearchType @default(STOCK)
+  resultSymbol String?  // If user clicked on a result
+  resultName   String?
+  
+  searchedAt DateTime @default(now())
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([searchedAt])
+  @@index([query])
+}
+
+enum SearchType {
+  STOCK
+  SECTOR
+  INDEX
+  NEWS
+  GENERAL
+}
+
+// ============================================
+// MARKET DATA (Cached/Reference)
+// ============================================
 
 model Sector {
   id          String   @id @default(cuid())
   name        String   @unique
+  displayName String?
   description String?
+  iconUrl     String?
+  color       String?  // For UI display
   stocks      Stock[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
 }
 
 model Stock {
-  id        String   @id @default(cuid())
-  symbol    String   @unique
-  name      String
-  sectorId  String
-  sector    Sector   @relation(fields: [sectorId], references: [id])
-  marketCap Float?
+  id          String   @id @default(cuid())
+  symbol      String   @unique
+  name        String
+  sectorId    String
+  industry    String?
+  marketCap   Float?
+  isActive    Boolean  @default(true)
+  isFnO       Boolean  @default(false)  // Futures & Options eligible
+  isIndex     Boolean  @default(false)
+  lotSize     Int?     // For F&O
+  
+  sector    Sector     @relation(fields: [sectorId], references: [id])
+  priceData StockPrice[]
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([symbol])
+  @@index([sectorId])
+}
+
+model StockPrice {
+  id             String   @id @default(cuid())
+  stockId        String
+  symbol         String
+  open           Float
+  high           Float
+  low            Float
+  close          Float
+  volume         BigInt
+  prevClose      Float?
+  change         Float?
+  changePercent  Float?
+  vwap           Float?   // Volume Weighted Average Price
+  
+  tradingDate DateTime
+  recordedAt  DateTime @default(now())
+  
+  stock Stock @relation(fields: [stockId], references: [id], onDelete: Cascade)
+
+  @@unique([stockId, tradingDate])
+  @@index([symbol])
+  @@index([tradingDate])
+}
+
+// ============================================
+// MARKET INDICES
+// ============================================
+
+model MarketIndex {
+  id            String   @id @default(cuid())
+  symbol        String   @unique
+  name          String
+  currentValue  Float?
+  change        Float?
+  changePercent Float?
+  open          Float?
+  high          Float?
+  low           Float?
+  prevClose     Float?
+  
+  lastUpdated DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([symbol])
+}
+
+// ============================================
+// ACTIVITY LOGS (For Analytics)
+// ============================================
+
+model ActivityLog {
+  id         String       @id @default(cuid())
+  userId     String?
+  action     ActivityType
+  details    Json?        // Additional action details
+  ipAddress  String?
+  userAgent  String?
+  
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+enum ActivityType {
+  LOGIN
+  LOGOUT
+  SIGNUP
+  PASSWORD_CHANGE
+  WATCHLIST_ADD
+  WATCHLIST_REMOVE
+  ALERT_CREATE
+  ALERT_DELETE
+  ALERT_TRIGGERED
+  SEARCH
+  STOCK_VIEW
+  SECTOR_VIEW
+  COMPARE_STOCKS
+  EXPORT_DATA
 }

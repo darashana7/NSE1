@@ -1,5 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getWatchlist } from '@/lib/watchlistStore'
+import { prisma } from '@/lib/prisma'
+import jwt from 'jsonwebtoken'
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
+
+interface JWTPayload {
+  userId: string
+  telegramId: string
+}
+
+async function getUserFromRequest(request: NextRequest) {
+  const token = request.cookies.get('auth-token')?.value
+  if (!token) return null
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload
+    return decoded.userId
+  } catch {
+    return null
+  }
+}
 
 const STOCK_NAMES: { [key: string]: string } = {
   'RELIANCE.NS': 'Reliance Industries',
@@ -80,17 +101,35 @@ async function fetchStockData(symbol: string, name: string) {
   return null
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const watchlist = getWatchlist()
+    const userId = await getUserFromRequest(request)
 
-    if (watchlist.length === 0) {
+    let watchlistItems: { symbol: string; name: string; notes?: string | null }[] = []
+
+    if (userId) {
+      // Fetch from database for authenticated users
+      const dbWatchlist = await prisma.watchlist.findMany({
+        where: { userId },
+        orderBy: [{ priority: 'desc' }, { addedAt: 'desc' }]
+      })
+      watchlistItems = dbWatchlist.map(item => ({
+        symbol: item.symbol,
+        name: item.name,
+        notes: item.notes
+      }))
+    } else {
+      // Fall back to in-memory store for unauthenticated users
+      watchlistItems = getWatchlist()
+    }
+
+    if (watchlistItems.length === 0) {
       return NextResponse.json([])
     }
 
     // Fetch real data for all watchlist items with timeout protection
     const watchlistWithData: any[] = []
-    const stockPromises = watchlist.map(async (item) => {
+    const stockPromises = watchlistItems.map(async (item) => {
       try {
         // Add 5 second timeout to prevent hanging
         const timeoutPromise = new Promise<null>((_, reject) =>
@@ -99,7 +138,7 @@ export async function GET() {
 
         const fetchPromise = fetchStockData(item.symbol, item.name)
         const data = await Promise.race([fetchPromise, timeoutPromise])
-        return data
+        return { ...data, notes: item.notes }
       } catch (error) {
         // If fetch fails, return basic info without live price data
         console.error(`Failed to fetch ${item.symbol}:`, error)
@@ -114,7 +153,8 @@ export async function GET() {
           dayHigh: 0,
           dayLow: 0,
           previousClose: 0,
-          open: 0
+          open: 0,
+          notes: item.notes
         }
       }
     })
@@ -131,6 +171,101 @@ export async function GET() {
     console.error('Error fetching watchlist:', error)
     return NextResponse.json(
       { error: 'Failed to fetch watchlist' },
+      { status: 500 }
+    )
+  }
+}
+
+// POST - Add stock to watchlist
+export async function POST(request: NextRequest) {
+  try {
+    const userId = await getUserFromRequest(request)
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { symbol, name, notes } = body
+
+    if (!symbol || !name) {
+      return NextResponse.json(
+        { error: 'Symbol and name are required' },
+        { status: 400 }
+      )
+    }
+
+    const watchlistItem = await prisma.watchlist.upsert({
+      where: {
+        userId_symbol: { userId, symbol }
+      },
+      update: { notes },
+      create: {
+        userId,
+        symbol,
+        name,
+        notes
+      }
+    })
+
+    // Log activity
+    await prisma.activityLog.create({
+      data: {
+        userId,
+        action: 'WATCHLIST_ADD',
+        details: { symbol, name }
+      }
+    })
+
+    return NextResponse.json(watchlistItem, { status: 201 })
+
+  } catch (error) {
+    console.error('Error adding to watchlist:', error)
+    return NextResponse.json(
+      { error: 'Failed to add to watchlist' },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE - Remove stock from watchlist
+export async function DELETE(request: NextRequest) {
+  try {
+    const userId = await getUserFromRequest(request)
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const symbol = searchParams.get('symbol')
+
+    if (!symbol) {
+      return NextResponse.json(
+        { error: 'Symbol is required' },
+        { status: 400 }
+      )
+    }
+
+    await prisma.watchlist.delete({
+      where: {
+        userId_symbol: { userId, symbol }
+      }
+    })
+
+    // Log activity
+    await prisma.activityLog.create({
+      data: {
+        userId,
+        action: 'WATCHLIST_REMOVE',
+        details: { symbol }
+      }
+    })
+
+    return NextResponse.json({ success: true, message: 'Removed from watchlist' })
+
+  } catch (error) {
+    console.error('Error removing from watchlist:', error)
+    return NextResponse.json(
+      { error: 'Failed to remove from watchlist' },
       { status: 500 }
     )
   }
