@@ -70,7 +70,8 @@ function VerifyContent() {
         const result = await verify(telegramId, verifyCode)
 
         if (result.success) {
-            router.push('/')
+            // Force a hard navigation to ensure cookies are properly read
+            window.location.href = '/'
         } else {
             setError(result.error || 'Verification failed')
             setCode(['', '', '', '', '', ''])

@@ -2,11 +2,20 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Home, Star, Bell, BarChart3, GitCompare, Menu, X, Activity } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { Home, Star, Bell, BarChart3, GitCompare, Menu, X, Activity, LogOut, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Badge } from '@/components/ui/badge'
+import { useAuth } from '@/contexts/auth-context'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 const navItems = [
     { href: '/', label: 'Home', icon: Home },
@@ -18,7 +27,14 @@ const navItems = [
 
 export function Navigation() {
     const pathname = usePathname()
+    const router = useRouter()
+    const { user, logout, isLoading } = useAuth()
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+    const handleLogout = async () => {
+        await logout()
+        router.push('/login')
+    }
 
     return (
         <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -63,6 +79,37 @@ export function Navigation() {
                             <span className="text-xs">Live</span>
                         </Badge>
                         <ThemeToggle />
+
+                        {/* User Menu */}
+                        {!isLoading && user && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="relative">
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                                            <User className="h-4 w-4 text-white" />
+                                        </div>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                    <DropdownMenuLabel>
+                                        <div className="flex flex-col space-y-1">
+                                            <p className="text-sm font-medium leading-none">
+                                                {user.name || 'User'}
+                                            </p>
+                                            <p className="text-xs leading-none text-muted-foreground">
+                                                @{user.telegramId}
+                                            </p>
+                                        </div>
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={handleLogout} className="text-red-500 cursor-pointer">
+                                        <LogOut className="mr-2 h-4 w-4" />
+                                        <span>Log out</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
+
                         <Button
                             variant="ghost"
                             size="icon"
@@ -100,6 +147,26 @@ export function Navigation() {
                                 </Link>
                             )
                         })}
+                        {!isLoading && user && (
+                            <>
+                                <div className="border-t pt-2 mt-2">
+                                    <div className="px-4 py-2 text-sm text-muted-foreground">
+                                        Signed in as @{user.telegramId}
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        className="w-full justify-start text-red-500"
+                                        onClick={() => {
+                                            setMobileMenuOpen(false)
+                                            handleLogout()
+                                        }}
+                                    >
+                                        <LogOut className="h-4 w-4 mr-2" />
+                                        Log out
+                                    </Button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
             </div>

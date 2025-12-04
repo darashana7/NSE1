@@ -70,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (!res.ok) {
                 return { success: false, error: result.error }
             }
+            // Note: User will be set after verification, not here
             return { success: true }
         } catch (error) {
             return { success: false, error: 'Login failed' }
