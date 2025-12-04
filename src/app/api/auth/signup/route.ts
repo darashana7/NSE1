@@ -90,8 +90,11 @@ export async function POST(request: NextRequest) {
             // Delete the user if we couldn't send the code
             await prisma.user.delete({ where: { id: user.id } })
             return NextResponse.json(
-                { error: 'Failed to send verification code. Please check your Telegram ID.' },
-                { status: 500 }
+                {
+                    error: 'Could not send verification code. Please open Telegram and start a chat with the bot first (send /start), then try again.',
+                    hint: 'You must message the bot on Telegram before it can send you codes.'
+                },
+                { status: 400 }
             )
         }
 
